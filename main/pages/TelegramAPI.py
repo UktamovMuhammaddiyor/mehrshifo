@@ -11,7 +11,6 @@ def sentMessage(message_type, chat_id, text, reply_markup={}, parse_mode='HTML',
             reply_markup[0]: [[{'text': i[0], 'callback_data': i[1], 'url': i[2]} for i in reply_markup[1][son]]
                               for son in range(len(reply_markup[1]))]
         }
-    print(reply_markup)
 
     if message_type == "Message":
         return requests.post(BOT_URL + 'sendMessage', {
@@ -57,7 +56,10 @@ def getMemberInformation(chat_id, user_id):
         'user_id': user_id
     }).json()
 
-    return result['result']['status']
+    if 'result' in result:
+        return result['result']['status']
+
+    return ""
 
 
 def forwardMessage(chat_id, from_chat_id, message_id):

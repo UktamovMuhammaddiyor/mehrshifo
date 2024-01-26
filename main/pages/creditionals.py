@@ -1,8 +1,8 @@
 TOKEN = "5184905704:AAFTNczwSxt-xZD5mtd49NgKtv-J8geDN_o"
-URL = "https://74fe-94-158-61-30.ngrok-free.app/getpost/"
+URL = "https://1d0f-94-158-59-241.ngrok-free.app/getpost/"
 BOT_URL = f"https://api.telegram.org/bot{TOKEN}/"
 
-# {'update_id': 282433149, 
+# {'update_id': 282433149, s
 #  'message': {'message_id': 220, 
 #              'from': {'id': 1618456770, 
 #                       'is_bot': False, 

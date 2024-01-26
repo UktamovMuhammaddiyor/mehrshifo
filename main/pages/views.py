@@ -4,7 +4,7 @@ from .creditionals import BOT_URL, URL
 from django.views.decorators.csrf import csrf_exempt
 import json
 from .TelegramAPI import sentMessage, getMemberInformation, answerCallbackQuery, forwardMessage
-from .models import BotUser, AboutMessage, ChannelBot
+from .models import BotUser, AboutMessage, ChannelBot, ChannelMessage
 
 
 # Create your views here.
@@ -27,6 +27,7 @@ def getPost(request):
 
         response = json.loads(request.body)
         message = AboutMessage.objects.all()
+
         if message:
             message = message[0]
 
@@ -47,7 +48,16 @@ def getPost(request):
                         if text == 'WTlJgvNGS3PZGOv':
                             user.status = ''
                             user.is_admin = True
-                            sentMessage('Message', user.user_id, "Siz endi adminsiz.")
+                            reply_markup = {
+                                'keyboard': [[{'text': '/addchannel'}], [{'text': '/addChannelPost'}], [{'text': '/createMainPost'}], [{'text': '/addPost'}]],
+                                'resize_keyboard': True,
+                            }
+
+                            requests.post(BOT_URL + 'sendMessage', {
+                                'chat_id': user.user_id,
+                                'text': "Siz endi adminsiz.",
+                                'reply_markup': json.dumps(reply_markup)
+                                }).json()
                         else:
                             sentMessage('Message', user.user_id, "Parol nato'g'ri")
                             user.status = ''
@@ -57,14 +67,16 @@ def getPost(request):
                         user.status = 'addingChannel'
                         sentMessage('Message', user.user_id, "Shu botni kanalga admibn qilib qo'shing va kanal usernamini jo'nating: ")
                     elif user.status == 'addingChannel':
-                        user.status = ''
                         chat = ChannelBot.objects.filter(chat_link=text)
                         if chat:
+                            user.status = ''
                             messages = AboutMessage.objects.all()
                             for i in messages:
                                 i.delete()
                             AboutMessage.objects.create(link=chat[0].chat_link, chat_id=chat[0].chat_id)
                             sentMessage('Message', user.user_id, "Kanal qo'shildi.")
+                        else:
+                            sentMessage('Message', user.user_id, "Bot kanalga qo'shilmagan yoki admin emas.")
                     elif text == '/createMainPost':
                         user.status = 'creatingmainpost'
                         sentMessage('Message', user.user_id, "Postni jo'nating")
@@ -85,8 +97,30 @@ def getPost(request):
                         for chat_id in users:
                             forwardMessage(chat_id.user_id, user.user_id, response['message_id'])
                         sentMessage('Message', user.user_id, "Habar hammaga jo'natildi.")
+                    elif text == '/addChannelPost':
+                        user.status = 'addingChannelPost'
+                        sentMessage('Message', user.user_id, "Postni jo'nating.")
+                    elif user.status == 'addingPostAnswer':
+                        user.status = ''
+                        channel_message = ChannelMessage.objects.first()
+                        sentMessage(channel_message.message_type, channel_message.chat_id, channel_message.message, ['inline_keyboard', [[["Javobini bilish", "done", ""]]]], file_id=channel_message.file_id)
+                        sentMessage("Message", user.user_id, "Post kanalga jo'natildi.")
+                    elif user.status == 'addingChannelPost':
+                        channel_messages = ChannelMessage.objects.all()
+                        for channel_message in channel_messages:
+                            channel_message.delete()
 
-                    message.save()
+                        channel_message = ChannelMessage.objects.create(message=text)
+                        channel_message.message_type = 'Message'
+                        channel_message.chat_id = message.chat_id
+                        channel_message.save()
+
+                        user.status = 'addingPostAnswer'
+                        sentMessage("Message", user.user_id, "Post uchun javobni qo'shing.")
+
+                    if message:
+                        message.save()
+
                     user.save()
             else:
                 user = BotUser.objects.get(user_id=response["from"]["id"])
@@ -114,23 +148,43 @@ def getPost(request):
                     for chat_id in users:
                         forwardMessage(chat_id.user_id, user.user_id, response['message_id'])
                     sentMessage('Message', user.user_id, "Habar hammaga jo'natildi.")
+                elif user.status == 'addingChannelPost':
+
+                    if 'photo' in response:
+                        file_id = response['photo'][-1]['file_id']
+                        m_type = 'Photo'
+                    elif 'video' in response:
+                        file_id = response['photo'][-1]['file_id']
+                        m_type = 'Video'
+
+                    channel_messages = ChannelMessage.objects.all()
+                    for channel_message in channel_messages:
+                        channel_message.delete()
+
+                    channel_message = ChannelMessage.objects.create()
+                    channel_message.message = response['caption']
+                    channel_message.file_id = file_id
+                    channel_message.message_type = m_type
+                    channel_message.chat_id = message.chat_id
+                    channel_message.save()
+                    user.status = 'addingPostAnswer'
+                    sentMessage("Message", user.user_id, "Post uchun javobni qo'shing.")
+                    
                 user.save()
-            if user.status == "":
-                    messages = AboutMessage.objects.all()
-                    message = messages[0]
-                    sentMessage(message.message_type, user.user_id, message.message, ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Javobini bilish", "done", ""]]]], file_id=message.file_id)
+            if user.status == "" and message:
+                sentMessage(message.message_type, user.user_id, message.message, ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Javobini bilish", "done", ""]]]], file_id=message.file_id)
         elif 'callback_query' in response:
             response = response['callback_query']
             if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
-                result = answerCallbackQuery(response['id'], message.answer, True)
+                answerCallbackQuery(response['id'], message.answer, True)
             else:
-                result = answerCallbackQuery(response['id'], "You are not member of channel", True)
+                answerCallbackQuery(response['id'], "Javobni bilish uchun iltimos kanalga a'zo blo'ling.", True)
         elif 'my_chat_member' in response:
             response = response['my_chat_member']['chat']
             try:
-                channel = ChannelBot.objects.get(chat_id=response['id'])
-            except:
-                channel = ChannelBot.objects.create(name=response['title'], chat_link=f"https://t.me/{response['username']}", chat_id=response['id'])
+                ChannelBot.objects.get(chat_id=response['id'])
+            except: 
+                ChannelBot.objects.create(name=response['title'], chat_link=f"https://t.me/{response['username']}", chat_id=response['id'])
     return HttpResponse('working')
 
 
@@ -138,9 +192,9 @@ def getUser(response, user=None):
     """ create user or get user """
 
     try:
-        user = BotUser.objects.get(user_id=response['from']['id'])
+        BotUser.objects.get(user_id=response['from']['id'])
     except:
-        user = BotUser.objects.create(user_id=response['from']['id'], name=response['from']['first_name'])
+        BotUser.objects.create(user_id=response['from']['id'], name=response['from']['first_name'])
 
     return user
 
@@ -150,7 +204,7 @@ def userHasMemberOfChannel(chat_id, user_id):
 
     result = getMemberInformation(chat_id, user_id)
 
-    if result == "member" or result == "creater" or result == "admin":
+    if result == "member" or result == "creator" or result == "admin":
         return True
     
     return False
