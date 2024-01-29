@@ -72,3 +72,12 @@ def forwardMessage(chat_id, from_chat_id, message_id):
     }).json()
 
     return result
+
+
+def deleteMessage(chat_id, message_id):
+    """ delete message with message_id in chat_id """
+
+    return requests.post(BOT_URL + 'deleteMessage', {
+        'chat_id': chat_id,
+        'message_id': message_id,
+    })

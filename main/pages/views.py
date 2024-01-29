@@ -3,8 +3,8 @@ import requests
 from .creditionals import BOT_URL, URL
 from django.views.decorators.csrf import csrf_exempt
 import json
-from .TelegramAPI import sentMessage, getMemberInformation, answerCallbackQuery, forwardMessage
-from .models import BotUser, AboutMessage, ChannelBot, ChannelMessage
+from .TelegramAPI import sentMessage, getMemberInformation, answerCallbackQuery, forwardMessage, deleteMessage
+from .models import BotUser, AboutMessage, ChannelBot, ChannelMessage, GroupBot, AutoAnswer
 
 
 # Create your views here.
@@ -34,9 +34,49 @@ def getPost(request):
         if 'message' in response:
             response = response['message']
 
-            if "text" in response:
+            if response['chat']['type'] == 'supergroup' or response['chat']['type'] == 'group' or response['chat']['type'] == 'channel':
+                if 'reply_to_message' in response:
+                    if response['reply_to_message']['text'] == "Iltimos guruhni qo'shish uchun parolni tering.":
+                        if response["text"] == 'WTlJgvNGS3PZGOv':
+                            group = GroupBot.objects.filter(group_id=response['chat']['id'])
+                            if group:
+                                group[0].is_active = True
+                                group[0].save()
+                                requests.post(BOT_URL + 'sendMessage', {
+                                    'chat_id': response['chat']['id'],
+                                    'text': "Guruh activlashtirildi.",
+                                    'reply_parameters': json.dumps({
+                                        'message_id': response['message_id'],
+                                    }),
+                                })
+                                deleteMessage(response['chat']['id'], response['reply_to_message']['message_id'])
+                            else:
+                                requests.post(BOT_URL + 'sendMessage', {
+                                    'chat_id': response['chat']['id'],
+                                    'text': "Guruh topilmadi botni guruhga boshqattan qo'shing.",
+                                    'reply_parameters': json.dumps({
+                                        'message_id': response['message_id'],
+                                    }),
+                                })
+                        else:
+                            requests.post(BOT_URL + 'sendMessage', {
+                                'chat_id': response['chat']['id'],
+                                'text': "Parol nato'g'ri",
+                                'reply_parameters': json.dumps({
+                                    'message_id': response['message_id'],
+                                }),
+                            })
+                    elif response['reply_to_message']['from']['is_bot'] and ('forward_origin' in response['reply_to_message']):
+                        requests.post(BOT_URL + 'copyMessage', {
+                            'chat_id': response['reply_to_message']['forward_origin']['sender_user']['id'],
+                            'from_chat_id': response['chat']['id'],
+                            'message_id': response['message_id'],
+                        })
+            elif "text" in response:
                 text = response['text']
                 if text == "/start":
+                    if message:
+                        sentMessage(message.message_type, user.user_id, message.message, ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Tekshirish", "check", ""]]]], file_id=message.file_id)
                     user = getUser(response)
                 else:
                     user = BotUser.objects.get(user_id=response["from"]["id"])
@@ -49,7 +89,7 @@ def getPost(request):
                             user.status = ''
                             user.is_admin = True
                             reply_markup = {
-                                'keyboard': [[{'text': '/addchannel'}], [{'text': '/addChannelPost'}], [{'text': '/createMainPost'}], [{'text': '/addPost'}]],
+                                'keyboard': [[{'text': '/addchannel'}, {'text': '/addChannelPost'}], [{'text': '/createMainPost'}], [{'text': '/addPost'}], [{'text': '/subcription'}, {'text': '/addAnswer'}]],
                                 'resize_keyboard': True,
                             }
 
@@ -62,7 +102,37 @@ def getPost(request):
                             sentMessage('Message', user.user_id, "Parol nato'g'ri")
                             user.status = ''
                     elif not user.is_admin:
-                        pass
+                        result = True
+                        if message:
+                            if message.is_active:
+                                if userHasMemberOfChannel(message.chat_id, user.user_id):
+                                    user.is_subcribe = True
+                                else:
+                                    result = False
+                                    sentMessage("Message", user.user_id, "Iltimos botdan foydalanish uchun kanalga obuna bo'ling", ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Tekshirish", "check", ""]]]])
+                        if result:
+                            group = GroupBot.objects.all()
+                            group = group[0]
+                            answer = AutoAnswer.objects.all()
+                            if answer:
+                                sentMessage("Message", user.user_id, answer[0].text)
+                            else:
+                                sentMessage("Message", user.user_id, "Murojatiz qabul qilindi.")
+                            forwardMessage(group.group_id, user.user_id, response['message_id'])
+                    elif text == '/subcription':
+                        sentMessage("Message", user.user_id, "Majburiy obuna", ['inline_keyboard', [[["Yoqish", 'turn_on_subcription', '']], [["O'chirish", "turn_off_subcription", ""]]]])
+                    elif text == "/addAnswer":
+                        user.status = 'addinganswer'
+                        sentMessage('Message', user.user_id, "Iltimos javobni jo'nating.")
+                    elif user.status == 'addinganswer':
+                        user.status = ''
+                        answer = AutoAnswer.objects.all()
+                        if answer:
+                            answer[0].text = text
+                            answer[0].save()
+                        else:
+                            AutoAnswer.objects.create(text=text)
+                        sentMessage("Message", user.user_id, "Auto javob qo'shildi.")
                     elif text == '/addchannel':
                         user.status = 'addingChannel'
                         sentMessage('Message', user.user_id, "Shu botni kanalga admibn qilib qo'shing va kanal usernamini jo'nating: ")
@@ -103,8 +173,11 @@ def getPost(request):
                     elif user.status == 'addingPostAnswer':
                         user.status = ''
                         channel_message = ChannelMessage.objects.first()
-                        sentMessage(channel_message.message_type, channel_message.chat_id, channel_message.message, ['inline_keyboard', [[["Javobini bilish", "done", ""]]]], file_id=channel_message.file_id)
-                        sentMessage("Message", user.user_id, "Post kanalga jo'natildi.")
+                        channel_message.answer = text
+                        channel_message.save()
+                        result = sentMessage(channel_message.message_type, channel_message.chat_id, channel_message.message, ['inline_keyboard', [[["Javobini bilish", f"checkAnswer-{channel_message.id}", ""]]]], file_id=channel_message.file_id)
+                        if 'result' in result:
+                            sentMessage("Message", user.user_id, f"Post kanalga jo'natildi.\nPost linki \n<code>https://t.me/{result['result']['sender_chat']['username']}/{result['result']['message_id']}</code>")
                     elif user.status == 'addingChannelPost':
                         channel_messages = ChannelMessage.objects.all()
                         for channel_message in channel_messages:
@@ -112,7 +185,8 @@ def getPost(request):
 
                         channel_message = ChannelMessage.objects.create(message=text)
                         channel_message.message_type = 'Message'
-                        channel_message.chat_id = message.chat_id
+                        if message.chat_id:
+                            channel_message.chat_id = message.chat_id
                         channel_message.save()
 
                         user.status = 'addingPostAnswer'
@@ -165,26 +239,69 @@ def getPost(request):
                     channel_message.message = response['caption']
                     channel_message.file_id = file_id
                     channel_message.message_type = m_type
-                    channel_message.chat_id = message.chat_id
+                    if message.chat_id:
+                        channel_message.chat_id = message.chat_id
                     channel_message.save()
                     user.status = 'addingPostAnswer'
                     sentMessage("Message", user.user_id, "Post uchun javobni qo'shing.")
                     
                 user.save()
-            if user.status == "" and message:
-                sentMessage(message.message_type, user.user_id, message.message, ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Javobini bilish", "done", ""]]]], file_id=message.file_id)
         elif 'callback_query' in response:
             response = response['callback_query']
-            if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
-                answerCallbackQuery(response['id'], message.answer, True)
-            else:
-                answerCallbackQuery(response['id'], "Javobni bilish uchun iltimos kanalga a'zo blo'ling.", True)
+            data = response['data']
+            if data[:12] == "checkAnswer-":
+                channel_message = ChannelMessage.objects.first()
+                if userHasMemberOfChannel(channel_message.chat_id, response['from']['id']) :
+                    answerCallbackQuery(response['id'], channel_message.answer, True)
+                else:
+                    answerCallbackQuery(response['id'], "Javobni bilish uchun iltimos kanalga a'zo bo'ling.", True)
+            elif data == 'turn_on_subcription':
+                if message:
+                    message.is_active = True
+                    message.save()
+                sentMessage("Message", response['from']['id'], "Majburiy obuna yoqildi.")
+                deleteMessage(response['from']['id'], response['message']['message_id'])
+            elif data == 'turn_off_subcription':
+                if message:
+                    message.is_active = False
+                    message.save()
+                sentMessage("Message", response['from']['id'], "Majburiy obuna o'chirildi.")
+                deleteMessage(response['from']['id'], response['message']['message_id'])
+            elif data == 'done':
+                if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
+                    answerCallbackQuery(response['id'], message.answer, True)
+                else:
+                    answerCallbackQuery(response['id'], "Javobni bilish uchun iltimos kanalga a'zo bo'ling.", True)
+            elif data == 'check':
+                if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
+                    bot_user = BotUser.objects.get(user_id=response['from']['id'])
+                    bot_user.is_subcribe = True
+                    bot_user.save()
+                    answerCallbackQuery(response['id'], "Siz kanalga a'zo bo'libsiz. Endi bemalol botdan foydlanishingiz mumkin. Raxmat!!!", True)
+                else:
+                    answerCallbackQuery(response['id'], "Botga yozish uchun iltimos kanalga a'zo bo'ling.", True)
         elif 'my_chat_member' in response:
-            response = response['my_chat_member']['chat']
-            try:
-                ChannelBot.objects.get(chat_id=response['id'])
-            except: 
-                ChannelBot.objects.create(name=response['title'], chat_link=f"https://t.me/{response['username']}", chat_id=response['id'])
+            result = response['my_chat_member']['chat']
+            response = response['my_chat_member']
+            if result['type'] == 'channel':
+                try:
+                    ChannelBot.objects.get(chat_id=result['id'])
+                except: 
+                    if 'username' in result:
+                        ChannelBot.objects.create(name=result['title'], chat_link=f"https://t.me/{result['username']}", chat_id=result['id'])
+                    else:
+                        ChannelBot.objects.create(name=result['title'], chat_id=result['id'])
+            elif result['type'] == "group" or result['type'] == "supergroup":
+                if response['new_chat_member']['status'] == "administrator":
+                    try:
+                        group = GroupBot.objects.get(group_id=result['id'])
+                    except: 
+                        if 'username' in result:
+                            group = GroupBot.objects.create(name=result['title'], group_link=f"https://t.me/{result['username']}", group_id=result['id'])
+                        else:
+                            group = GroupBot.objects.create(name=result['title'], group_id=result['id'])
+                    sentMessage('Message', group.group_id, "Iltimos guruhni qo'shish uchun parolni tering.")
+
     return HttpResponse('working')
 
 
@@ -192,9 +309,9 @@ def getUser(response, user=None):
     """ create user or get user """
 
     try:
-        BotUser.objects.get(user_id=response['from']['id'])
+        user = BotUser.objects.get(user_id=response['from']['id'])
     except:
-        BotUser.objects.create(user_id=response['from']['id'], name=response['from']['first_name'])
+        user = BotUser.objects.create(user_id=response['from']['id'], name=response['from']['first_name'])
 
     return user
 

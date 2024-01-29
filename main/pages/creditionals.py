@@ -1,5 +1,5 @@
 TOKEN = "5184905704:AAFTNczwSxt-xZD5mtd49NgKtv-J8geDN_o"
-URL = "https://1d0f-94-158-59-241.ngrok-free.app/getpost/"
+URL = "https://28ee-84-54-122-156.ngrok-free.app/getpost/"
 BOT_URL = f"https://api.telegram.org/bot{TOKEN}/"
 
 # {'update_id': 282433149, s
@@ -57,3 +57,23 @@ BOT_URL = f"https://api.telegram.org/bot{TOKEN}/"
 #                                                {'offset': 218, 'length': 6, 'type': 'bold'}, 
                                                
 #                                                {'offset': 218, 'length': 6, 'type': 'underline'}]}}
+{'update_id': 282433465, 
+ 'message': {'message_id': 20, 
+             'from': {'id': 1618456770, 'is_bot': False, 'first_name': 'Muhammaddiyor', 'username': 'uktamov_muhammaddiyor', 'language_code': 'en'}, 
+             'chat': {'id': -1002083440724, 'title': 'New group', 'type': 'supergroup'}, 
+             'date': 1706461995, 
+             'message_thread_id': 18, 
+             'reply_to_message': {'message_id': 18, 
+                                  'from': {'id': 5184905704, 'is_bot': True, 'first_name': 'Tarjimon', 'username': 'mdrxbot'}, 
+                                  'chat': {'id': -1002083440724, 'title': 'New group', 'type': 'supergroup'}, 
+                                  'date': 1706461734, 
+                                  'forward_origin': {'type': 'user', 
+                                                     'sender_user': {'id': 1246762008, 'is_bot': False, 'first_name': 'Muhammaddiyor', 'username': 'Muhammmaddiyor_uktamov', 'language_code': 'en'}, 
+                                                     'date': 1706461684}, 
+                                    'forward_from': {'id': 1246762008, 
+                                                                      'is_bot': False, 
+                                                                      'first_name': 'Muhammaddiyor', 
+                                                                      'username': 'Muhammmaddiyor_uktamov', 'language_code': 'en'}, 
+                                    'forward_date': 1706461684, 
+                                    'text': 'Salom'}, 
+                                   'text': ';;;'}}

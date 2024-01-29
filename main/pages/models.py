@@ -7,6 +7,7 @@ class BotUser(models.Model):
     user_name = models.CharField(max_length=255)
     is_admin = models.BooleanField(default=False)
     status = models.CharField(max_length=255, default="")
+    is_subcribe = models.BooleanField(default=False)
 
     def __str__(self) -> str:
         return self.name
@@ -20,6 +21,7 @@ class AboutMessage(models.Model):
     file_id = models.CharField(max_length=255, default=0, blank=True)
     message_id = models.IntegerField(default=0, blank=True)
     answer = models.CharField(max_length=255, default="", blank=True)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self) -> str:
         return self.link
@@ -38,8 +40,25 @@ class ChannelMessage(models.Model):
 
 class ChannelBot(models.Model):
     name = models.CharField(max_length=255)
-    chat_link = models.CharField(max_length=255)
+    chat_link = models.CharField(max_length=255, blank=True)
     chat_id = models.IntegerField()
 
     def __str__(self) -> str:
         return self.name
+
+
+class GroupBot(models.Model):
+    name = models.CharField(max_length=255)
+    group_link = models.CharField(max_length=255, blank=True)
+    group_id = models.IntegerField()
+    is_active = models.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class AutoAnswer(models.Model):
+    text = models.TextField(default="")
+
+    def __str__(self) -> str:
+        return self.text[:20]
