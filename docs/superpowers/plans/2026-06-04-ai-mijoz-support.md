@@ -56,13 +56,18 @@ print("\n".join(lines))
 PY
 ```
 
-- [ ] **Step 3: Convert the tests stub into a package**
+- [ ] **Step 3: Convert tests.py into a package — PRESERVE the existing suite**
+
+`pages/tests.py` already holds a real 20-test suite that pins current webhook behavior
+(do NOT delete it). Move it into a new `tests/` package so new modules live alongside it:
 
 ```bash
-rm -f pages/tests.py
 mkdir -p pages/tests
+git mv pages/tests.py pages/tests/test_legacy_webhook.py
 touch pages/tests/__init__.py
 ```
+
+Confirm they still pass: `python manage.py test pages.tests.test_legacy_webhook -v 1` → 20 OK.
 
 - [ ] **Step 4: Write the failing infra test**
 
@@ -2207,15 +2212,38 @@ these new branches:
                                         f"Bugungi chaqiruvlar: {calls}\nHandoff suhbatlar: {handoffs}")
 ```
 
-- [ ] **Step 11: Run the webhook tests + the full suite**
+- [ ] **Step 11: Update the legacy test that asserted the old forward behavior**
+
+Step 9 replaced the synchronous ack+forward with an enqueue, so the legacy test
+`test_non_admin_message_with_no_groupbot_acknowledges_without_forward` (now in
+`pages/tests/test_legacy_webhook.py`) no longer matches. Replace that one test method with:
+
+```python
+    @patch("django_q.tasks.async_task")
+    def test_non_admin_message_enqueues_ai_job(self, p_async):
+        # After AI integration: a non-admin private message is enqueued for the AI
+        # worker (the old synchronous ack + forward now happen inside the worker).
+        BotUser.objects.create(name="U", user_id=5, user_name="", is_admin=False)
+        resp = self.post(make_message("salom", user_id=5))
+        self.assertEqual(resp.status_code, 200)
+        p_async.assert_called_once_with("pages.tasks.process_client_message", 5, "salom", 10)
+        self.p_sent.assert_not_called()
+        self.p_forward.assert_not_called()
+```
+
+(Other legacy tests are unaffected: their fixtures omit `update_id` so dedupe is skipped,
+they send no secret header so verification is skipped, and only this test exercises the
+non-admin branch.)
+
+- [ ] **Step 12: Run the webhook tests + the full suite**
 
 Run: `python manage.py test pages.tests.test_webhook -v 2`  → PASS (4 tests)
-Run: `python manage.py test pages -v 2`  → all tests PASS.
+Run: `python manage.py test pages -v 2`  → all tests PASS (legacy 20, one updated, + new).
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add main/pages/views.py main/pages/tests/test_webhook.py
+git add main/pages/views.py main/pages/tests/test_webhook.py main/pages/tests/test_legacy_webhook.py
 git commit -m "feat: route customer messages to the AI queue; webhook secret + dedupe"
 ```
 
