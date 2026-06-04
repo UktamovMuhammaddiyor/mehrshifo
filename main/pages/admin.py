@@ -1,7 +1,14 @@
 from django.contrib import admin
+from django.http import HttpResponse
 from .models import BotUser, ChannelBot, AboutMessage, ChannelMessage, GroupBot, AutoAnswer
 from .models import Service, Doctor, ClinicInfo, FAQ
 from .models import AISettings, AIDecisionLog
+from .knowledge.snapshot import get_kb_snapshot
+
+
+@admin.action(description="Preview assembled KB (what the AI sees)")
+def preview_kb(modeladmin, request, queryset):
+    return HttpResponse(get_kb_snapshot(), content_type="text/plain; charset=utf-8")
 
 # Register your models here.
 admin.site.register(BotUser)
@@ -17,6 +24,7 @@ class ServiceAdmin(admin.ModelAdmin):
     list_display = ("name", "category", "price", "currency", "is_active", "updated_at")
     list_editable = ("price", "currency", "is_active")
     search_fields = ("name", "category")
+    actions = [preview_kb]
 
 
 @admin.register(Doctor)
