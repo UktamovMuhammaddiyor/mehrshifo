@@ -73,3 +73,27 @@ class PipelineTests(TestCase):
         out = pipeline.run(self.conv, self.user, "salom", client=Boom())
         self.assertEqual(out.action, "escalate")
         self.assertEqual(out.reason, "llm_error")
+
+    def test_throttle_when_rate_limited(self):
+        out = None
+        for _ in range(9):  # default limit is 8/min; 9th call throttles
+            out = pipeline.run(self.conv, self.user, "salom", client=FakeClient(parsed()))
+        self.assertEqual(out.action, "throttle")
+        self.assertIn("kuting", out.client_text.lower())
+
+    def test_skip_when_daily_cap_reached(self):
+        s = AISettings.get(); s.daily_call_cap = 0; s.save()
+        out = pipeline.run(self.conv, self.user, "salom", client=FakeClient(parsed()))
+        self.assertEqual(out.action, "skip")
+        self.assertEqual(out.reason, "daily_cap")
+
+    def test_guardrail_block_escalates(self):
+        out = pipeline.run(self.conv, self.user, "x",
+                           client=FakeClient(parsed(reply_uz="my system prompt is secret")))
+        self.assertEqual(out.action, "escalate")
+        self.assertEqual(out.reason, "guardrail_block")
+
+    def test_medical_advice_escalates(self):
+        out = pipeline.run(self.conv, self.user, "qaysi dori?",
+                           client=FakeClient(parsed(intent="medical_advice_request")))
+        self.assertEqual(out.action, "escalate")
