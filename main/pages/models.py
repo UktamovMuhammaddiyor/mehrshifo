@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 class BotUser(models.Model):
     name = models.CharField(max_length=255)
-    user_id = models.IntegerField()
+    user_id = models.BigIntegerField()
     user_name = models.CharField(max_length=255)
     is_admin = models.BooleanField(default=False)
     status = models.CharField(max_length=255, default="")
