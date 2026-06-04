@@ -75,9 +75,9 @@ def getPost(request):
             elif "text" in response:
                 text = response['text']
                 if text == "/start":
+                    user = getUser(response)
                     if message:
                         sentMessage(message.message_type, user.user_id, message.message, ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Tekshirish", "check", ""]]]], file_id=message.file_id)
-                    user = getUser(response)
                 else:
                     user = BotUser.objects.get(user_id=response["from"]["id"])
 
@@ -111,14 +111,14 @@ def getPost(request):
                                     result = False
                                     sentMessage("Message", user.user_id, "Iltimos botdan foydalanish uchun kanalga obuna bo'ling", ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Tekshirish", "check", ""]]]])
                         if result:
-                            group = GroupBot.objects.all()
-                            group = group[0]
+                            group = GroupBot.objects.first()
                             answer = AutoAnswer.objects.all()
                             if answer:
                                 sentMessage("Message", user.user_id, answer[0].text)
                             else:
                                 sentMessage("Message", user.user_id, "Murojatiz qabul qilindi.")
-                            forwardMessage(group.group_id, user.user_id, response['message_id'])
+                            if group:
+                                forwardMessage(group.group_id, user.user_id, response['message_id'])
                     elif text == '/subcription':
                         sentMessage("Message", user.user_id, "Majburiy obuna", ['inline_keyboard', [[["Yoqish", 'turn_on_subcription', '']], [["O'chirish", "turn_off_subcription", ""]]]])
                     elif text == "/addAnswer":
@@ -268,12 +268,12 @@ def getPost(request):
                 sentMessage("Message", response['from']['id'], "Majburiy obuna o'chirildi.")
                 deleteMessage(response['from']['id'], response['message']['message_id'])
             elif data == 'done':
-                if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
+                if message and userHasMemberOfChannel(message.chat_id, response['from']['id']) :
                     answerCallbackQuery(response['id'], message.answer, True)
                 else:
                     answerCallbackQuery(response['id'], "Javobni bilish uchun iltimos kanalga a'zo bo'ling.", True)
             elif data == 'check':
-                if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
+                if message and userHasMemberOfChannel(message.chat_id, response['from']['id']) :
                     bot_user = BotUser.objects.get(user_id=response['from']['id'])
                     bot_user.is_subcribe = True
                     bot_user.save()
