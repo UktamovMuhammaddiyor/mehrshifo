@@ -1,3 +1,33 @@
+EXCLUDED_INTENTS = {"personal_data_request", "medical_advice_request"}
+
+
+def _maybe_capture_suggestion(target_user_id, answer_text):
+    """Capture (last customer question, staff answer) as a pending FAQ suggestion,
+    unless the latest escalation was personal/medical (privacy)."""
+    from ..models import BotUser, Conversation, ConversationMessage, AIDecisionLog, FAQSuggestion
+    answer_text = (answer_text or "").strip()
+    if not answer_text:
+        return
+    try:
+        user = BotUser.objects.get(user_id=target_user_id)
+    except BotUser.DoesNotExist:
+        return
+    conv = Conversation.active_for(user)
+    last_decision = AIDecisionLog.objects.filter(conversation=conv).order_by("-id").first()
+    if last_decision and last_decision.intent in EXCLUDED_INTENTS:
+        return
+    question = (
+        ConversationMessage.objects.filter(conversation=conv, role="client")
+        .order_by("-id").values_list("text", flat=True).first()
+    )
+    if not question:
+        return
+    FAQSuggestion.objects.get_or_create(
+        question=question, answer=answer_text,
+        defaults={"source_conversation": conv, "status": "pending"},
+    )
+
+
 def _set_status(target_user_id, status):
     from ..models import BotUser, Conversation
     try:
@@ -32,4 +62,5 @@ def handle_group_message(response) -> bool:
     from ..TelegramAPI import copyMessage
     copyMessage(target_user_id, response["chat"]["id"], response["message_id"])
     _set_status(target_user_id, "handoff")
+    _maybe_capture_suggestion(target_user_id, response.get("text") or response.get("caption"))
     return True
