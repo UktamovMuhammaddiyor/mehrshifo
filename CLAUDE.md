@@ -13,7 +13,7 @@ The git repo root is this directory. The Django project lives one level down in 
 - `main/manage.py` — run all Django commands from inside `main/`.
 - `main/main/` — project config (`settings.py`, `urls.py`, `wsgi.py`, `asgi.py`).
 - `main/pages/` — the only app; contains all bot logic.
-- `main/db.sqlite3` — committed SQLite database (dev data lives in the repo).
+- `main/db.sqlite3` — SQLite database (gitignored; not committed).
 
 ## Commands
 
@@ -28,7 +28,7 @@ python manage.py test             # test runner (pages/tests.py is an empty stub
 python manage.py test pages.tests.ClassName.test_method  # single test
 ```
 
-`requirements.txt` is **UTF-16 LE encoded**, not UTF-8 — `pip install -r requirements.txt` may fail to parse it. Re-encode to UTF-8 first, or install the listed packages by hand (Django 5.0.1, requests 2.31.0 and their deps).
+`requirements.txt` is UTF-8 encoded. Install with `pip install -r requirements.txt` as usual.
 
 ## Local setup the code requires
 
@@ -81,3 +81,25 @@ Forced channel subscription (membership checked via `userHasMemberOfChannel` →
 
 - After changing `pages/models.py`, generate and commit a migration — the existing 17 migrations in `pages/migrations/` are the source of truth for the SQLite schema.
 - New bot interactions are almost always a new branch inside `getPost` plus (for outbound calls) a helper in `TelegramAPI.py`. Match the existing status-string FSM pattern rather than introducing a separate state store.
+
+## AI customer support (pages/ai, pages/knowledge, pages/handlers)
+
+Customer private messages are no longer forwarded inline. `getPost` verifies the
+`X-Telegram-Bot-Api-Secret-Token` header, dedupes by `update_id` (`ProcessedUpdate`),
+and enqueues `pages.tasks.process_client_message` on the Django-Q2 queue. The worker runs
+`pages/ai/pipeline.py` (gates → grounded OpenAI call → routing) and `pages/handlers/private_ai.py`
+sends the reply to the customer + mirrors it into the support group. Staff replies in the
+group are handled by `pages/handlers/group.py` (relay via `copyMessage` + set conversation
+to `handoff`; `/ai_resume` reactivates).
+
+KB lives in `Service/Doctor/ClinicInfo/FAQ` (edit in Django admin); `pages/knowledge/snapshot.py`
+caches the assembled KB text and invalidates it on save, so price edits apply immediately.
+The LLM only returns text + intent; all side effects are in our code. Toggle with `/ai_on`
+`/ai_off` (allowlisted via `ADMIN_USER_IDS`); inspect with `/ai_status`.
+
+### Running it
+- `python manage.py createcachetable` once (DatabaseCache, shared across processes).
+- Run the worker alongside the web process: `python manage.py qcluster`.
+- New env vars: `OPENAI_API_KEY`, `TELEGRAM_WEBHOOK_SECRET`, `ADMIN_USER_IDS` (see `.env.example`).
+- Re-register the webhook (`GET /setwebhook/`) after setting `TELEGRAM_WEBHOOK_SECRET`.
+- Tests use in-memory cache automatically; run `python manage.py test pages`.
