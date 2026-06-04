@@ -8,5 +8,5 @@ requests==2.31.0
 sqlparse==0.4.4
 tzdata==2023.4
 urllib3==2.1.0
-openai
-django-q2
+openai==1.109.1
+django-q2==1.10.0

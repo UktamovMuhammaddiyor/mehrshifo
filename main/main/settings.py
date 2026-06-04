@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -164,8 +165,7 @@ CACHES = {
 
 # The DatabaseCache table is created by `createcachetable`, not by migrations,
 # so it does not exist in the throwaway test DB. Use in-memory cache under tests.
-import sys as _sys
-if 'test' in _sys.argv:
+if sys.argv[1:2] == ['test']:
     CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
 
 # Django-Q2 task queue. ORM broker = no Redis. timeout MUST be < retry.

@@ -13,5 +13,6 @@ class InfraTests(TestCase):
         self.assertLess(settings.Q_CLUSTER["timeout"], settings.Q_CLUSTER["retry"])
 
     def test_shared_cache_roundtrip(self):
+        """Verifies the cache API contract under the test override (LocMemCache), not cross-process durability."""
         cache.set("infra_probe", "ok", 30)
         self.assertEqual(cache.get("infra_probe"), "ok")
