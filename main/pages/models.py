@@ -119,3 +119,42 @@ class FAQ(models.Model):
 
     def __str__(self) -> str:
         return self.question
+
+
+class Conversation(models.Model):
+    STATUS_CHOICES = [("active", "active"), ("handoff", "handoff"), ("closed", "closed")]
+    user = models.ForeignKey(BotUser, on_delete=models.CASCADE, related_name="conversations")
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="active")
+    handoff_until = models.DateTimeField(null=True, blank=True)  # reserved; manual resume in P1
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"{self.user} [{self.status}]"
+
+    @classmethod
+    def active_for(cls, user):
+        conv = (
+            cls.objects.filter(user=user, status__in=["active", "handoff"])
+            .order_by("-id")
+            .first()
+        )
+        if conv is None:
+            conv = cls.objects.create(user=user, status="active")
+        return conv
+
+
+class ConversationMessage(models.Model):
+    ROLE_CHOICES = [("client", "client"), ("ai", "ai"), ("staff", "staff")]
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="messages"
+    )
+    role = models.CharField(max_length=8, choices=ROLE_CHOICES)
+    text = models.TextField(blank=True)
+    tg_message_id = models.BigIntegerField(null=True, blank=True)
+    intent = models.CharField(max_length=64, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
