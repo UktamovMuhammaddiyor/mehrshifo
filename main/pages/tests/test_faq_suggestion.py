@@ -23,3 +23,15 @@ class FAQSuggestionTests(TestCase):
         s.approve(reviewer="x")
         s.approve(reviewer="x")  # second call must not create a duplicate FAQ
         self.assertEqual(FAQ.objects.filter(question="Q").count(), 1)
+
+    def test_reject_action_skips_approved(self):
+        from unittest import mock
+        from pages.admin import reject_suggestions
+        from pages.models import FAQSuggestion
+        s = FAQSuggestion.objects.create(question="Q", answer="A")
+        s.approve(reviewer="admin")
+        req = mock.Mock()
+        req.user.get_username.return_value = "admin2"
+        reject_suggestions(None, req, FAQSuggestion.objects.all())
+        s.refresh_from_db()
+        self.assertEqual(s.status, "approved")  # not flipped to rejected

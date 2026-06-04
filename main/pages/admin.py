@@ -68,7 +68,9 @@ def approve_suggestions(modeladmin, request, queryset):
 
 @admin.action(description="Reject")
 def reject_suggestions(modeladmin, request, queryset):
-    queryset.update(status="rejected", reviewed_by=request.user.get_username())
+    queryset.filter(status="pending").update(
+        status="rejected", reviewed_by=request.user.get_username()
+    )
 
 
 @admin.register(FAQSuggestion)

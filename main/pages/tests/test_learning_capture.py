@@ -46,3 +46,19 @@ class LearningCaptureTests(TestCase):
     def test_ai_resume_does_not_capture(self, copy):
         group_handler.handle_group_message(staff_reply(555, "/ai_resume"))
         self.assertEqual(FAQSuggestion.objects.count(), 0)
+
+    @mock.patch("pages.TelegramAPI.copyMessage")
+    def test_does_not_capture_medical_advice(self, copy):
+        from pages.models import AIDecisionLog, FAQSuggestion
+        AIDecisionLog.objects.create(conversation=self.conv, intent="medical_advice_request",
+                                     action="escalate", confidence=0.9)
+        group_handler.handle_group_message(staff_reply(555, "Bu dorini iching"))
+        self.assertEqual(FAQSuggestion.objects.count(), 0)
+
+    @mock.patch("pages.TelegramAPI.copyMessage")
+    def test_captures_when_no_decision_log(self, copy):
+        # Deliberate: with no AIDecisionLog (e.g. manual mode), capture proceeds.
+        # Safe because nothing reaches the live FAQ without explicit admin approval.
+        from pages.models import FAQSuggestion
+        group_handler.handle_group_message(staff_reply(555, "Manzil: Chilonzor 5"))
+        self.assertEqual(FAQSuggestion.objects.filter(status="pending").count(), 1)

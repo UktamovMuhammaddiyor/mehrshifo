@@ -34,6 +34,7 @@ class Command(BaseCommand):
             raise CommandError(f"Cannot read export: {exc}")
 
         messages = data.get("messages", [])
+        messages = [m for m in messages if m.get("type", "message") == "message"]
         by_id = {m.get("id"): m for m in messages if "id" in m}
         created = 0
         for m in messages:
