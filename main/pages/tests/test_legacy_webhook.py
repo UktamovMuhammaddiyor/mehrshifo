@@ -363,13 +363,13 @@ class SingleRowConfigEmptyTableTests(GetPostTestBase):
         self.assertTrue(BotUser.objects.filter(user_id=88).exists())
         self.p_sent.assert_called_once()
 
-    def test_non_admin_message_with_no_groupbot_acknowledges_without_forward(self):
-        # FIXED: with no GroupBot row, GroupBot.objects.first() returns None and the
-        # forward is guarded, so there is no IndexError. The user still receives the
-        # default acknowledgement, but nothing is forwarded.
+    @patch("django_q.tasks.async_task")
+    def test_non_admin_message_enqueues_ai_job(self, p_async):
+        # After AI integration: a non-admin private message is enqueued for the AI
+        # worker (the old synchronous ack + forward now happen inside the worker).
         BotUser.objects.create(name="U", user_id=5, user_name="", is_admin=False)
-        self.assertEqual(GroupBot.objects.count(), 0)
         resp = self.post(make_message("salom", user_id=5))
         self.assertEqual(resp.status_code, 200)
-        self.p_sent.assert_called_once_with("Message", 5, "Murojatiz qabul qilindi.")
+        p_async.assert_called_once_with("pages.tasks.process_client_message", 5, "salom", 10)
+        self.p_sent.assert_not_called()
         self.p_forward.assert_not_called()
