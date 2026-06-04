@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kontent</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body{font-family:system-ui,sans-serif;margin:0;padding:16px;background:var(--tg-theme-bg-color,#fff);color:var(--tg-theme-text-color,#000)}
+    label{display:block;margin:10px 0 4px;font-weight:600}
+    input,textarea,select{width:100%;box-sizing:border-box;padding:8px;font-size:15px}
+    textarea{min-height:160px}
+    .row{margin:8px 0}.targets label{display:inline-flex;align-items:center;font-weight:400;margin-right:14px}
+    .targets input{width:auto;margin-right:6px}
+    button{margin-top:14px;padding:11px;width:100%;font-size:16px;border:0;border-radius:8px;background:var(--tg-theme-button-color,#2481cc);color:var(--tg-theme-button-text-color,#fff)}
+    #status{margin-top:10px;font-size:14px;opacity:.8}
+    .hidden{display:none}
+  </style>
+</head>
+<body>
+  <div class="row">
+    <label>Tur</label>
+    <select id="kind"><option value="post">Post (qisqa)</option><option value="article">Maqola (uzun)</option></select>
+  </div>
+  <div class="row">
+    <label>Usul</label>
+    <select id="mode"><option value="ai">AI yozadi</option><option value="manual">O'zim yozaman</option></select>
+  </div>
+  <div class="row"><label for="title">Sarlavha</label><input id="title" type="text"></div>
+  <div class="row" id="refRow"><label for="ref">Manba havola (ixtiyoriy)</label><input id="ref" type="url"></div>
+  <button id="genBtn">AI bilan yozdirish</button>
+  <div class="row"><label for="body">Matn</label><textarea id="body"></textarea></div>
+  <div class="row targets">
+    <label>Qayerga:</label>
+    <label><input type="checkbox" id="t_site">Sayt</label>
+    <label><input type="checkbox" id="t_channel">Kanal</label>
+    <label><input type="checkbox" id="t_users">Bot foydalanuvchilari</label>
+  </div>
+  <button id="pubBtn">Publish</button>
+  <div id="status"></div>
+
+<script>
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) tg.ready();
+const initData = tg ? tg.initData : "";
+const $ = id => document.getElementById(id);
+let draftId = null;
+const setStatus = m => $("status").textContent = m;
+
+function api(path, method, body){
+  return fetch(path, {method, headers:{"Content-Type":"application/json","X-Telegram-Init-Data":initData},
+    body: body ? JSON.stringify(body) : undefined}).then(r => r.json().then(j => ({ok:r.ok, j})));
+}
+function syncMode(){
+  const ai = $("mode").value === "ai";
+  $("genBtn").classList.toggle("hidden", !ai);
+  $("refRow").classList.toggle("hidden", !ai);
+}
+$("mode").addEventListener("change", syncMode); syncMode();
+
+$("genBtn").addEventListener("click", async () => {
+  setStatus("Yozilmoqda…"); $("genBtn").disabled = true;
+  const {ok, j} = await api("/miniapp/api/generate","POST",
+    {kind:$("kind").value, title:$("title").value, reference_link:$("ref").value});
+  if(!ok){ setStatus("Xatolik: "+(j.error||"")); $("genBtn").disabled=false; return; }
+  draftId = j.draft_id;
+  const poll = setInterval(async () => {
+    const {j:d} = await api("/miniapp/api/draft/"+draftId,"GET");
+    if(d.status === "ready"){ clearInterval(poll); $("body").value = d.body; setStatus("Tayyor — tahrirlang."); $("genBtn").disabled=false; }
+    else if(d.status === "failed"){ clearInterval(poll); setStatus("Yaratishda xato: "+(d.error||"")); $("genBtn").disabled=false; }
+  }, 2000);
+});
+
+$("pubBtn").addEventListener("click", async () => {
+  setStatus("Yuborilmoqda…"); $("pubBtn").disabled = true;
+  const {ok, j} = await api("/miniapp/api/publish","POST",{
+    draft_id:draftId, kind:$("kind").value, title:$("title").value, body:$("body").value,
+    targets:{site:$("t_site").checked, channel:$("t_channel").checked, bot_users:$("t_users").checked}});
+  $("pubBtn").disabled = false;
+  if(!ok){ setStatus("Xatolik: "+(j.error||"")); return; }
+  setStatus("Natija: "+JSON.stringify(j.results));
+});
+</script>
+</body>
+</html>

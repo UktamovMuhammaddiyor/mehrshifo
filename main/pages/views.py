@@ -115,6 +115,12 @@ def getPost(request):
                                 'resize_keyboard': True,
                             }
 
+                            from .creditionals import MINIAPP_URL
+                            if MINIAPP_URL:
+                                reply_markup['keyboard'].append(
+                                    [{'text': "✍️ Kontent", 'web_app': {'url': MINIAPP_URL}}]
+                                )
+
                             requests.post(BOT_URL + 'sendMessage', {
                                 'chat_id': user.user_id,
                                 'text': "Siz endi adminsiz.",
