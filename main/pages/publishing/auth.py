@@ -10,6 +10,8 @@ def validate_init_data(raw_init_data, max_age_seconds=86400):
     from ..creditionals import BOT_TOKEN
     if not raw_init_data:
         return None
+    if not BOT_TOKEN:
+        return None
     pairs = dict(parse_qsl(raw_init_data, keep_blank_values=True))
     received_hash = pairs.pop("hash", None)
     if not received_hash:
@@ -26,12 +28,13 @@ def validate_init_data(raw_init_data, max_age_seconds=86400):
     if max_age_seconds and (time.time() - auth_date) > max_age_seconds:
         return None
     try:
-        return json.loads(pairs.get("user", ""))
+        parsed = json.loads(pairs.get("user") or "")
     except (json.JSONDecodeError, TypeError):
         return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def is_allowed(user):
     """Fail-closed staff gate: empty allowlist denies everyone."""
     from ..creditionals import ADMIN_USER_IDS
-    return bool(user) and bool(ADMIN_USER_IDS) and user.get("id") in ADMIN_USER_IDS
+    return isinstance(user, dict) and bool(ADMIN_USER_IDS) and user.get("id") in ADMIN_USER_IDS

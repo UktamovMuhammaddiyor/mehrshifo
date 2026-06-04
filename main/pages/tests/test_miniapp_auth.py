@@ -48,3 +48,17 @@ class InitDataAuthTests(SimpleTestCase):
     @mock.patch("pages.creditionals.ADMIN_USER_IDS", [])
     def test_is_allowed_fails_closed_when_empty(self):
         self.assertFalse(is_allowed({"id": 777}))
+
+    @mock.patch("pages.creditionals.BOT_TOKEN", TOKEN)
+    def test_non_dict_user_rejected(self):
+        raw = sign({"auth_date": str(int(time.time())), "user": json.dumps([1, 2])})
+        self.assertIsNone(validate_init_data(raw))
+
+    @mock.patch("pages.creditionals.BOT_TOKEN", "")
+    def test_empty_bot_token_rejected(self):
+        raw = sign({"auth_date": str(int(time.time())), "user": json.dumps({"id": 1})}, token="")
+        self.assertIsNone(validate_init_data(raw))
+
+    def test_is_allowed_handles_non_dict(self):
+        self.assertFalse(is_allowed(None))
+        self.assertFalse(is_allowed([1, 2]))
