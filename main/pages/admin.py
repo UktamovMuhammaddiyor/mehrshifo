@@ -55,3 +55,25 @@ class AIDecisionLogAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+from .models import FAQSuggestion
+
+
+@admin.action(description="Approve → create FAQ")
+def approve_suggestions(modeladmin, request, queryset):
+    for s in queryset.filter(status="pending"):
+        s.approve(reviewer=request.user.get_username())
+
+
+@admin.action(description="Reject")
+def reject_suggestions(modeladmin, request, queryset):
+    queryset.update(status="rejected", reviewed_by=request.user.get_username())
+
+
+@admin.register(FAQSuggestion)
+class FAQSuggestionAdmin(admin.ModelAdmin):
+    list_display = ("question", "status", "reviewed_by", "created_at")
+    list_filter = ("status",)
+    search_fields = ("question", "answer")
+    actions = [approve_suggestions, reject_suggestions]

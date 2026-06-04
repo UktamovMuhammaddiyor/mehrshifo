@@ -210,3 +210,31 @@ class AIDecisionLog(models.Model):
 
     class Meta:
         ordering = ["-id"]
+
+
+class FAQSuggestion(models.Model):
+    STATUS_CHOICES = [("pending", "pending"), ("approved", "approved"), ("rejected", "rejected")]
+    question = models.CharField(max_length=512)
+    answer = models.TextField()
+    source_conversation = models.ForeignKey(
+        "Conversation", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    reviewed_by = models.CharField(max_length=255, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self) -> str:
+        return f"[{self.status}] {self.question}"
+
+    def approve(self, reviewer=""):
+        """Create a real FAQ from this suggestion (idempotent) and mark approved."""
+        faq, _ = FAQ.objects.get_or_create(
+            question=self.question, defaults={"answer": self.answer}
+        )
+        self.status = "approved"
+        self.reviewed_by = reviewer or None
+        self.save(update_fields=["status", "reviewed_by"])
+        return faq
