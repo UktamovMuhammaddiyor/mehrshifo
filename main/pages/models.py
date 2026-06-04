@@ -62,3 +62,60 @@ class AutoAnswer(models.Model):
 
     def __str__(self) -> str:
         return self.text[:20]
+
+
+class Service(models.Model):
+    name = models.CharField(max_length=255)
+    category = models.CharField(max_length=255, blank=True)
+    price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    currency = models.CharField(max_length=8, default="UZS")
+    duration_min = models.PositiveIntegerField(null=True, blank=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class Doctor(models.Model):
+    full_name = models.CharField(max_length=255)
+    specialty = models.CharField(max_length=255, blank=True)
+    schedule_text = models.CharField(max_length=255, blank=True)
+    bio = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.full_name
+
+
+class ClinicInfo(models.Model):
+    """Single-row clinic profile (one clinic, no branches)."""
+    name = models.CharField(max_length=255, default="")
+    address = models.CharField(max_length=512, blank=True)
+    geo_lat = models.FloatField(null=True, blank=True)
+    geo_long = models.FloatField(null=True, blank=True)
+    phones = models.CharField(max_length=255, blank=True)
+    working_hours = models.CharField(max_length=512, blank=True)
+    days_off = models.CharField(max_length=255, blank=True)
+    extra_notes = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.name or "ClinicInfo"
+
+    @classmethod
+    def get(cls):
+        return cls.objects.first()
+
+
+class FAQ(models.Model):
+    question = models.CharField(max_length=512)
+    answer = models.TextField()
+    category = models.CharField(max_length=255, blank=True)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return self.question
