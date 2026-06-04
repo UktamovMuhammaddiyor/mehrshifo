@@ -30,3 +30,9 @@ TELEGRAM_WEBHOOK_SECRET = os.environ.get('TELEGRAM_WEBHOOK_SECRET', '')
 ADMIN_USER_IDS = [
     int(x) for x in os.environ.get('ADMIN_USER_IDS', '').split(',') if x.strip()
 ]
+
+# --- Mini-App content publishing ---
+WORDPRESS_URL = os.environ.get('WORDPRESS_URL', '')
+WORDPRESS_USER = os.environ.get('WORDPRESS_USER', '')
+WORDPRESS_APP_PASSWORD = os.environ.get('WORDPRESS_APP_PASSWORD', '')
+MINIAPP_URL = os.environ.get('MINIAPP_URL', '')

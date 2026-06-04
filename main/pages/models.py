@@ -212,6 +212,33 @@ class AIDecisionLog(models.Model):
         ordering = ["-id"]
 
 
+class ContentDraft(models.Model):
+    KIND_CHOICES = [("post", "post"), ("article", "article")]
+    MODE_CHOICES = [("ai", "ai"), ("manual", "manual")]
+    STATUS_CHOICES = [
+        ("draft", "draft"), ("generating", "generating"), ("ready", "ready"),
+        ("published", "published"), ("failed", "failed"),
+    ]
+    created_by = models.ForeignKey(BotUser, null=True, blank=True, on_delete=models.SET_NULL)
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES, default="post")
+    mode = models.CharField(max_length=16, choices=MODE_CHOICES, default="ai")
+    title = models.CharField(max_length=512, blank=True)
+    reference_link = models.URLField(blank=True)
+    body = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="draft")
+    error = models.TextField(blank=True)
+    targets = models.JSONField(default=dict, blank=True)
+    publish_results = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self) -> str:
+        return f"[{self.status}] {self.kind}: {self.title}"
+
+
 class FAQSuggestion(models.Model):
     STATUS_CHOICES = [("pending", "pending"), ("approved", "approved"), ("rejected", "rejected")]
     question = models.CharField(max_length=512)

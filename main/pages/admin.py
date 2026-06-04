@@ -57,7 +57,15 @@ class AIDecisionLogAdmin(admin.ModelAdmin):
         return False
 
 
-from .models import FAQSuggestion
+from .models import ContentDraft, FAQSuggestion
+
+
+@admin.register(ContentDraft)
+class ContentDraftAdmin(admin.ModelAdmin):
+    list_display = ("title", "kind", "mode", "status", "created_by", "created_at")
+    list_filter = ("status", "kind", "mode")
+    search_fields = ("title", "body")
+    readonly_fields = ("publish_results", "created_at", "updated_at")
 
 
 @admin.action(description="Approve → create FAQ")
