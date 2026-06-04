@@ -1,10 +1,17 @@
 from django.shortcuts import render, HttpResponse
 import requests
-from .creditionals import BOT_URL, URL
+from .creditionals import BOT_URL, URL, BOT_ADMIN_PASSWORD
 from django.views.decorators.csrf import csrf_exempt
 import json
 from .TelegramAPI import sentMessage, getMemberInformation, answerCallbackQuery, forwardMessage, deleteMessage
-from .models import BotUser, AboutMessage, ChannelBot, ChannelMessage, GroupBot, AutoAnswer
+from .models import BotUser, AboutMessage, ChannelBot, ChannelMessage, GroupBot, AutoAnswer, AISettings, Conversation
+
+
+
+def _is_allowlisted(user_id):
+    """AI/admin commands: allow if the allowlist is empty (back-compat) or contains the id."""
+    from .creditionals import ADMIN_USER_IDS
+    return (not ADMIN_USER_IDS) or (user_id in ADMIN_USER_IDS)
 
 
 # Create your views here.
@@ -16,7 +23,11 @@ def index(request):
 def setWebHook(request):
     """ set webhook for telegram API on URL """
 
-    response = requests.post(BOT_URL + 'setwebhook?url=' + URL).json()
+    from .creditionals import TELEGRAM_WEBHOOK_SECRET
+    response = requests.post(BOT_URL + 'setWebhook', {
+        'url': URL,
+        'secret_token': TELEGRAM_WEBHOOK_SECRET,
+    }).json()
     return HttpResponse(response)
 
 
@@ -25,7 +36,21 @@ def getPost(request):
     if request.method == 'POST':
         """ reply sent message from user """
 
+        from .creditionals import TELEGRAM_WEBHOOK_SECRET
+        from .models import ProcessedUpdate
+
+        if TELEGRAM_WEBHOOK_SECRET:
+            if request.headers.get('X-Telegram-Bot-Api-Secret-Token', '') != TELEGRAM_WEBHOOK_SECRET:
+                return HttpResponse('forbidden', status=403)
+
         response = json.loads(request.body)
+
+        update_id = response.get('update_id')
+        if update_id is not None:
+            _, created = ProcessedUpdate.objects.get_or_create(update_id=update_id)
+            if not created:
+                return HttpResponse('duplicate')
+
         message = AboutMessage.objects.all()
 
         if message:
@@ -36,8 +61,8 @@ def getPost(request):
 
             if response['chat']['type'] == 'supergroup' or response['chat']['type'] == 'group' or response['chat']['type'] == 'channel':
                 if 'reply_to_message' in response:
-                    if response['reply_to_message']['text'] == "Iltimos guruhni qo'shish uchun parolni tering.":
-                        if response["text"] == 'WTlJgvNGS3PZGOv':
+                    if response['reply_to_message'].get('text') == "Iltimos guruhni qo'shish uchun parolni tering.":
+                        if response["text"] == BOT_ADMIN_PASSWORD:
                             group = GroupBot.objects.filter(group_id=response['chat']['id'])
                             if group:
                                 group[0].is_active = True
@@ -66,18 +91,15 @@ def getPost(request):
                                     'message_id': response['message_id'],
                                 }),
                             })
-                    elif response['reply_to_message']['from']['is_bot'] and ('forward_origin' in response['reply_to_message']):
-                        requests.post(BOT_URL + 'copyMessage', {
-                            'chat_id': response['reply_to_message']['forward_origin']['sender_user']['id'],
-                            'from_chat_id': response['chat']['id'],
-                            'message_id': response['message_id'],
-                        })
+                    else:
+                        from .handlers.group import handle_group_message
+                        handle_group_message(response)
             elif "text" in response:
                 text = response['text']
                 if text == "/start":
+                    user = getUser(response)
                     if message:
                         sentMessage(message.message_type, user.user_id, message.message, ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Tekshirish", "check", ""]]]], file_id=message.file_id)
-                    user = getUser(response)
                 else:
                     user = BotUser.objects.get(user_id=response["from"]["id"])
 
@@ -85,13 +107,19 @@ def getPost(request):
                         user.status = 'getAdmin'
                         sentMessage('Message', user.user_id, 'Iltimos parolni kiriting:')
                     elif user.status == 'getAdmin':
-                        if text == 'WTlJgvNGS3PZGOv':
+                        if text == BOT_ADMIN_PASSWORD:
                             user.status = ''
                             user.is_admin = True
                             reply_markup = {
                                 'keyboard': [[{'text': '/addchannel'}, {'text': '/addChannelPost'}], [{'text': '/createMainPost'}], [{'text': '/addPost'}], [{'text': '/subcription'}, {'text': '/addAnswer'}]],
                                 'resize_keyboard': True,
                             }
+
+                            from .creditionals import MINIAPP_URL
+                            if MINIAPP_URL:
+                                reply_markup['keyboard'].append(
+                                    [{'text': "✍️ Kontent", 'web_app': {'url': MINIAPP_URL}}]
+                                )
 
                             requests.post(BOT_URL + 'sendMessage', {
                                 'chat_id': user.user_id,
@@ -111,16 +139,29 @@ def getPost(request):
                                     result = False
                                     sentMessage("Message", user.user_id, "Iltimos botdan foydalanish uchun kanalga obuna bo'ling", ['inline_keyboard', [[["Kanalga azo bo'lish", 'member', f'{message.link}']], [["Tekshirish", "check", ""]]]])
                         if result:
-                            group = GroupBot.objects.all()
-                            group = group[0]
-                            answer = AutoAnswer.objects.all()
-                            if answer:
-                                sentMessage("Message", user.user_id, answer[0].text)
-                            else:
-                                sentMessage("Message", user.user_id, "Murojatiz qabul qilindi.")
-                            forwardMessage(group.group_id, user.user_id, response['message_id'])
+                            from django_q.tasks import async_task
+                            async_task('pages.tasks.process_client_message',
+                                       user.user_id, text, response['message_id'])
                     elif text == '/subcription':
                         sentMessage("Message", user.user_id, "Majburiy obuna", ['inline_keyboard', [[["Yoqish", 'turn_on_subcription', '']], [["O'chirish", "turn_off_subcription", ""]]]])
+                    elif text == '/ai_on':
+                        if _is_allowlisted(user.user_id):
+                            s = AISettings.get(); s.is_enabled = True; s.save()
+                            sentMessage("Message", user.user_id, "AI yoqildi.")
+                    elif text == '/ai_off':
+                        if _is_allowlisted(user.user_id):
+                            s = AISettings.get(); s.is_enabled = False; s.save()
+                            sentMessage("Message", user.user_id, "AI o'chirildi.")
+                    elif text == '/ai_status':
+                        if _is_allowlisted(user.user_id):
+                            from django.core.cache import cache
+                            from .ai.pipeline import _daily_key
+                            s = AISettings.get()
+                            calls = cache.get(_daily_key()) or 0
+                            handoffs = Conversation.objects.filter(status='handoff').count()
+                            sentMessage("Message", user.user_id,
+                                        f"AI: {'ON' if s.is_enabled else 'OFF'}\nModel: {s.model_name}\n"
+                                        f"Bugungi chaqiruvlar: {calls}\nHandoff suhbatlar: {handoffs}")
                     elif text == "/addAnswer":
                         user.status = 'addinganswer'
                         sentMessage('Message', user.user_id, "Iltimos javobni jo'nating.")
@@ -268,12 +309,12 @@ def getPost(request):
                 sentMessage("Message", response['from']['id'], "Majburiy obuna o'chirildi.")
                 deleteMessage(response['from']['id'], response['message']['message_id'])
             elif data == 'done':
-                if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
+                if message and userHasMemberOfChannel(message.chat_id, response['from']['id']) :
                     answerCallbackQuery(response['id'], message.answer, True)
                 else:
                     answerCallbackQuery(response['id'], "Javobni bilish uchun iltimos kanalga a'zo bo'ling.", True)
             elif data == 'check':
-                if userHasMemberOfChannel(message.chat_id, response['from']['id']) :
+                if message and userHasMemberOfChannel(message.chat_id, response['from']['id']) :
                     bot_user = BotUser.objects.get(user_id=response['from']['id'])
                     bot_user.is_subcribe = True
                     bot_user.save()
