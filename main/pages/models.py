@@ -17,7 +17,7 @@ class AboutMessage(models.Model):
     link = models.CharField(max_length=255)
     message = models.TextField(blank=True)
     message_type = models.CharField(max_length=15, default="Message", blank=True)
-    chat_id = models.IntegerField(blank=True)
+    chat_id = models.BigIntegerField(blank=True)
     file_id = models.CharField(max_length=255, default=0, blank=True)
     message_id = models.IntegerField(default=0, blank=True)
     answer = models.CharField(max_length=255, default="", blank=True)
@@ -30,7 +30,7 @@ class AboutMessage(models.Model):
 class ChannelMessage(models.Model):
     message = models.TextField(blank=True)
     message_type = models.CharField(max_length=15, default="Message", blank=True)
-    chat_id = models.IntegerField(default=0)
+    chat_id = models.BigIntegerField(default=0)
     file_id = models.CharField(max_length=255, default=0, blank=True)
     answer = models.CharField(max_length=255, default="", blank=True)
 
@@ -41,7 +41,7 @@ class ChannelMessage(models.Model):
 class ChannelBot(models.Model):
     name = models.CharField(max_length=255)
     chat_link = models.CharField(max_length=255, blank=True)
-    chat_id = models.IntegerField()
+    chat_id = models.BigIntegerField()
 
     def __str__(self) -> str:
         return self.name
@@ -50,7 +50,7 @@ class ChannelBot(models.Model):
 class GroupBot(models.Model):
     name = models.CharField(max_length=255)
     group_link = models.CharField(max_length=255, blank=True)
-    group_id = models.IntegerField()
+    group_id = models.BigIntegerField()
     is_active = models.BooleanField(default=False)
 
     def __str__(self) -> str:
