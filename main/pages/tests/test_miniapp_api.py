@@ -58,3 +58,11 @@ class MiniAppApiTests(TestCase):
         r = self.c.post("/miniapp/api/generate", data=json.dumps({"kind": "post", "title": "T"}),
                         content_type="application/json", HTTP_X_TELEGRAM_INIT_DATA=valid_init(777))
         self.assertEqual(r.status_code, 403)
+
+    @mock.patch("pages.creditionals.BOT_TOKEN", TOKEN)
+    @mock.patch("pages.creditionals.ADMIN_USER_IDS", [777])
+    def test_malformed_body_returns_400(self):
+        r = self.c.post("/miniapp/api/generate", data="{not json",
+                        content_type="application/json",
+                        HTTP_X_TELEGRAM_INIT_DATA=valid_init())
+        self.assertEqual(r.status_code, 400)

@@ -2,12 +2,14 @@ import base64
 
 import requests
 
-from ..TelegramAPI import sentMessage
+from ..TelegramAPI import sentMessage, escape_html
 from ..models import BotUser, ChannelBot
 
 
 def _telegram_text(draft):
-    return f"<b>{draft.title}</b>\n\n{draft.body}" if draft.title else draft.body
+    title = escape_html(draft.title)
+    body = escape_html(draft.body)
+    return f"<b>{title}</b>\n\n{body}" if title else body
 
 
 class WordPressPublisher:

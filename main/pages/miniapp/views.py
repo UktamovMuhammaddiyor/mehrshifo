@@ -31,7 +31,10 @@ def api_generate(request):
     staff = _staff(request)
     if not staff:
         return JsonResponse({"error": "forbidden"}, status=403)
-    data = json.loads(request.body or "{}")
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid json"}, status=400)
     draft = start_generation(staff, data.get("kind", "post"), data.get("title", ""),
                              data.get("reference_link", ""))
     return JsonResponse({"draft_id": draft.id, "status": draft.status})
@@ -54,7 +57,10 @@ def api_publish(request):
     staff = _staff(request)
     if not staff:
         return JsonResponse({"error": "forbidden"}, status=403)
-    data = json.loads(request.body or "{}")
+    try:
+        data = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "invalid json"}, status=400)
     draft_id = data.get("draft_id")
     if draft_id:
         try:

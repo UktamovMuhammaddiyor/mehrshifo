@@ -46,6 +46,18 @@ class ChannelPublisherTests(TestCase):
         self.assertTrue(res["ok"])
         self.assertEqual(res["message_id"], 9)
 
+    @mock.patch("pages.publishing.publishers.sentMessage",
+                return_value={"ok": True, "result": {"message_id": 1}})
+    def test_channel_escapes_html(self, sent):
+        ChannelBot.objects.create(name="C", chat_id=-100)
+        u = BotUser.objects.create(name="S", user_id=2, user_name="s")
+        draft = ContentDraft.objects.create(created_by=u, kind="post",
+                                            title="A & B <x>", body="1 < 2")
+        publishers.ChannelPublisher().publish(draft)
+        text = sent.call_args.args[2]
+        self.assertIn("A &amp; B &lt;x&gt;", text)
+        self.assertIn("1 &lt; 2", text)
+
 
 class BotUsersPublisherTests(TestCase):
     @mock.patch("pages.publishing.publishers.sentMessage", return_value={"ok": True})
