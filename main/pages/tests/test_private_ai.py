@@ -41,3 +41,51 @@ class PrivateAIDeliverTests(TestCase):
         fwd.assert_called_once_with(-100, self.user.user_id, 81)
         # client got an acknowledgement (legacy behavior)
         self.assertTrue(sent.called)
+
+    @mock.patch("pages.TelegramAPI.forwardMessage")
+    @mock.patch("pages.TelegramAPI.sentMessage")
+    def test_throttle_sends_client_only(self, sent, fwd):
+        out = Outcome(action="throttle", client_text="Iltimos biroz kuting 🙏")
+        private_ai.deliver(out, self.user, "spam", 90, self.conv)
+        sent.assert_called_once_with("Message", self.user.user_id, "Iltimos biroz kuting 🙏")
+        fwd.assert_not_called()
+
+    @mock.patch("pages.TelegramAPI.forwardMessage", return_value={"result": {"message_id": 1}})
+    @mock.patch("pages.TelegramAPI.sentMessage")
+    def test_skip_handoff_forwards_only_no_ack(self, sent, fwd):
+        out = Outcome(action="skip", reason="handoff")
+        private_ai.deliver(out, self.user, "msg", 91, self.conv)
+        fwd.assert_called_once_with(-100, self.user.user_id, 91)
+        sent.assert_not_called()
+
+    @mock.patch("pages.TelegramAPI.sendMessageReply")
+    @mock.patch("pages.TelegramAPI.forwardMessage", return_value={"result": {"message_id": 1}})
+    @mock.patch("pages.TelegramAPI.sentMessage")
+    def test_complaint_pings_notify_user(self, sent, fwd, reply):
+        s = AISettings.get(); s.complaint_notify_user_id = 999; s.save()
+        out = Outcome(action="notify", client_text="Uzr", intent="complaint",
+                      confidence=0.9, group_label="⚠️ SHIKOYAT", notify=True, set_handoff=True)
+        private_ai.deliver(out, self.user, "yomon", 92, self.conv)
+        self.assertTrue(any(c.args[1] == 999 for c in sent.call_args_list))
+
+    @mock.patch("pages.TelegramAPI.sendMessageReply")
+    @mock.patch("pages.TelegramAPI.forwardMessage", return_value={})
+    @mock.patch("pages.TelegramAPI.sentMessage")
+    def test_standalone_card_when_no_forward_id(self, sent, fwd, reply):
+        out = Outcome(action="answer", client_text="javob", intent="info_question",
+                      confidence=0.9, group_label="🤖 AI")
+        private_ai.deliver(out, self.user, "q", 93, self.conv)
+        reply.assert_not_called()
+        self.assertTrue(any(c.args[1] == -100 for c in sent.call_args_list))
+
+    @mock.patch("pages.TelegramAPI.sendMessageReply")
+    @mock.patch("pages.TelegramAPI.forwardMessage")
+    @mock.patch("pages.TelegramAPI.sentMessage")
+    def test_no_active_group_still_replies(self, sent, fwd, reply):
+        from pages.models import GroupBot
+        GroupBot.objects.update(is_active=False)
+        out = Outcome(action="answer", client_text="javob", intent="info_question",
+                      confidence=0.9, group_label="🤖 AI")
+        private_ai.deliver(out, self.user, "q", 94, self.conv)
+        sent.assert_any_call("Message", self.user.user_id, "javob")
+        fwd.assert_not_called()
