@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'pages',
+    'django_q',
 ]
 
 MIDDLEWARE = [
@@ -151,3 +152,30 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Shared, cross-process cache (web process + qcluster worker). DatabaseCache
+# avoids Redis; the table is created by `manage.py createcachetable`.
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'mehrshifo_cache',
+    }
+}
+
+# The DatabaseCache table is created by `createcachetable`, not by migrations,
+# so it does not exist in the throwaway test DB. Use in-memory cache under tests.
+import sys as _sys
+if 'test' in _sys.argv:
+    CACHES = {'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}}
+
+# Django-Q2 task queue. ORM broker = no Redis. timeout MUST be < retry.
+Q_CLUSTER = {
+    'name': 'mehrshifo',
+    'orm': 'default',
+    'workers': 2,
+    'timeout': 60,
+    'retry': 120,
+    'max_attempts': 1,
+    'catch_up': False,
+    'save_limit': 250,
+}
