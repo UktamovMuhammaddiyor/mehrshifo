@@ -123,12 +123,18 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Dev/staging database (kept out of git; never the live prod db.sqlite3)
+db.dev.sqlite3
+*.dev.sqlite3
 
 # Spyder project settings
 .spyderproject

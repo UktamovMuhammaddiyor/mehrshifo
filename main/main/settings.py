@@ -10,22 +10,44 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Per-environment config lives in main/.env (one file per machine: dev or prod).
+# When no .env is present the defaults below reproduce the original behavior, so
+# deploying this to the live prod host without a .env changes nothing.
+load_dotenv(BASE_DIR / '.env')
+
+APP_ENV = os.environ.get('APP_ENV', 'prod')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-rut6(^3@i(=u$mq^47o)51ywv*50t(owzvlrsi&47#1xt=8+--'
+# The default reproduces the original key so an un-configured prod deploy keeps
+# its existing signed sessions; set a real SECRET_KEY via .env in every env.
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-rut6(^3@i(=u$mq^47o)51ywv*50t(owzvlrsi&47#1xt=8+--',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Set DEBUG=False in the prod .env.
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('1', 'true', 'yes', 'on')
 
-ALLOWED_HOSTS = ["28ee-84-54-122-156.ngrok-free.app", "127.0.0.1"]
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get(
+        'ALLOWED_HOSTS', '28ee-84-54-122-156.ngrok-free.app,127.0.0.1'
+    ).split(',')
+    if h.strip()
+]
 
 
 # Application definition
@@ -74,10 +96,17 @@ WSGI_APPLICATION = 'main.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+# Only APP_ENV=prod uses the live db.sqlite3; every other value (e.g. "staging")
+# gets an isolated db.dev.sqlite3. APP_ENV defaults to 'prod' (above), so a host
+# with no .env still uses the live database.
+DB_NAME = os.environ.get(
+    'DB_NAME', 'db.sqlite3' if APP_ENV == 'prod' else 'db.dev.sqlite3'
+)
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': BASE_DIR / DB_NAME,
     }
 }
 

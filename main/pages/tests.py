@@ -31,7 +31,9 @@ from pages.models import (
     AutoAnswer,
 )
 
-PASSWORD = "WTlJgvNGS3PZGOv"
+# The admin/group password is environment-driven (creditionals.BOT_ADMIN_PASSWORD,
+# default "WTlJgvNGS3PZGOv"); import it so tests track whatever the active env sets.
+from pages.creditionals import BOT_ADMIN_PASSWORD as PASSWORD
 
 
 # --------------------------------------------------------------------------- #

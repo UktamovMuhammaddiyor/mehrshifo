@@ -1,6 +1,6 @@
 from django.shortcuts import render, HttpResponse
 import requests
-from .creditionals import BOT_URL, URL
+from .creditionals import BOT_URL, URL, BOT_ADMIN_PASSWORD
 from django.views.decorators.csrf import csrf_exempt
 import json
 from .TelegramAPI import sentMessage, getMemberInformation, answerCallbackQuery, forwardMessage, deleteMessage
@@ -37,7 +37,7 @@ def getPost(request):
             if response['chat']['type'] == 'supergroup' or response['chat']['type'] == 'group' or response['chat']['type'] == 'channel':
                 if 'reply_to_message' in response:
                     if response['reply_to_message']['text'] == "Iltimos guruhni qo'shish uchun parolni tering.":
-                        if response["text"] == 'WTlJgvNGS3PZGOv':
+                        if response["text"] == BOT_ADMIN_PASSWORD:
                             group = GroupBot.objects.filter(group_id=response['chat']['id'])
                             if group:
                                 group[0].is_active = True
@@ -85,7 +85,7 @@ def getPost(request):
                         user.status = 'getAdmin'
                         sentMessage('Message', user.user_id, 'Iltimos parolni kiriting:')
                     elif user.status == 'getAdmin':
-                        if text == 'WTlJgvNGS3PZGOv':
+                        if text == BOT_ADMIN_PASSWORD:
                             user.status = ''
                             user.is_admin = True
                             reply_markup = {
