@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.test import TestCase
 from pages.models import BotUser, Conversation, AISettings
 from pages.ai import pipeline
@@ -20,6 +21,7 @@ def parsed(**over):
 
 class PipelineTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.user = BotUser.objects.create(name="A", user_id=1, user_name="a")
         self.conv = Conversation.active_for(self.user)
         s = AISettings.get()
