@@ -16,3 +16,8 @@ class GuardrailTests(SimpleTestCase):
         ok, reason = check_output("Ish vaqti 09:00-18:00.")
         self.assertTrue(ok)
         self.assertEqual(reason, "")
+
+    def test_check_output_blocks_additional_markers(self):
+        for bad in ("here is the bot_token value", "<|system|>", "telegram_webhook_secret=x"):
+            ok, _reason = check_output(bad)
+            self.assertFalse(ok)

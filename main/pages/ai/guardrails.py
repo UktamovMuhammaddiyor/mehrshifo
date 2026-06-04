@@ -4,6 +4,11 @@ SUSPICIOUS_OUTPUT_MARKERS = [
     "openai_api_key",
     "ignore previous",
     "qoidalaringni",
+    "<|system|>",
+    "initial instructions",
+    "bot_token",
+    "telegram_webhook_secret",
+    "secret_token",
 ]
 
 
