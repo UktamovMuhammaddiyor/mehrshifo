@@ -15,3 +15,9 @@ def process_client_message(user_id, text, message_id):
     )
     outcome = pipeline.run(conversation, user, text)
     private_ai.deliver(outcome, user, text, message_id, conversation)
+
+
+def generate_content_job(draft_id):
+    """Django-Q job: run async AI generation for a content draft."""
+    from .publishing.service import run_generation
+    run_generation(draft_id)
