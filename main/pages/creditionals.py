@@ -18,3 +18,15 @@ URL = os.environ.get('WEBHOOK_URL', '')
 # Password gating /getadmin and group activation. Defaults to the original
 # literal so prod keeps working until a per-environment password is set in .env.
 BOT_ADMIN_PASSWORD = os.environ.get('BOT_ADMIN_PASSWORD', 'WTlJgvNGS3PZGOv')
+
+# OpenAI API key for the customer-support AI.
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+
+# Secret token registered with setWebhook and checked on every webhook request
+# (Telegram echoes it in the X-Telegram-Bot-Api-Secret-Token header).
+TELEGRAM_WEBHOOK_SECRET = os.environ.get('TELEGRAM_WEBHOOK_SECRET', '')
+
+# Telegram user_id allowlist for admin + AI controls (comma-separated in .env).
+ADMIN_USER_IDS = [
+    int(x) for x in os.environ.get('ADMIN_USER_IDS', '').split(',') if x.strip()
+]
