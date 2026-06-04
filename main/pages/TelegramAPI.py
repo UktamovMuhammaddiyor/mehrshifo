@@ -1,3 +1,4 @@
+import html
 import json
 import requests
 from .creditionals import BOT_URL, URL
@@ -81,3 +82,27 @@ def deleteMessage(chat_id, message_id):
         'chat_id': chat_id,
         'message_id': message_id,
     })
+
+
+def copyMessage(chat_id, from_chat_id, message_id):
+    """Copy a message (used to relay a staff reply back to the customer)."""
+    return requests.post(BOT_URL + 'copyMessage', {
+        'chat_id': chat_id,
+        'from_chat_id': from_chat_id,
+        'message_id': message_id,
+    }).json()
+
+
+def sendMessageReply(chat_id, text, reply_to_message_id, parse_mode='HTML'):
+    """Send a message as a reply to a specific message (the group card)."""
+    return requests.post(BOT_URL + 'sendMessage', {
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': parse_mode,
+        'reply_parameters': json.dumps({'message_id': reply_to_message_id}),
+    }).json()
+
+
+def escape_html(text):
+    """Escape user text before embedding it in an HTML-parse_mode message."""
+    return html.escape(text or "")
