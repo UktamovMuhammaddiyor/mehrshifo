@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import BotUser, ChannelBot, AboutMessage, ChannelMessage, GroupBot, AutoAnswer
 from .models import Service, Doctor, ClinicInfo, FAQ
+from .models import AISettings, AIDecisionLog
 
 # Register your models here.
 admin.site.register(BotUser)
@@ -33,3 +34,16 @@ class FAQAdmin(admin.ModelAdmin):
 
 
 admin.site.register(ClinicInfo)
+
+
+admin.site.register(AISettings)
+
+
+@admin.register(AIDecisionLog)
+class AIDecisionLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "intent", "confidence", "action")
+    list_filter = ("action", "intent")
+    readonly_fields = [f.name for f in AIDecisionLog._meta.fields]
+
+    def has_add_permission(self, request):
+        return False

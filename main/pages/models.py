@@ -158,3 +158,55 @@ class ConversationMessage(models.Model):
 
     class Meta:
         ordering = ["id"]
+
+
+class AISettings(models.Model):
+    """Single-row AI configuration."""
+    is_enabled = models.BooleanField(default=False)
+    model_name = models.CharField(max_length=64, default="gpt-4o")
+    temperature = models.FloatField(default=0.3)
+    confidence_threshold = models.FloatField(default=0.6)
+    max_history_messages = models.PositiveIntegerField(default=12)
+    max_input_chars = models.PositiveIntegerField(default=2000)
+    max_output_tokens = models.PositiveIntegerField(default=500)
+    daily_call_cap = models.PositiveIntegerField(default=1500)
+    holding_message = models.TextField(
+        default="Savolingiz mutaxassisimizga yuborildi. Tez orada javob beramiz. 🙏"
+    )
+    persona_extra = models.TextField(blank=True)
+    complaint_notify_user_id = models.BigIntegerField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self) -> str:
+        return f"AISettings (enabled={self.is_enabled})"
+
+    @classmethod
+    def get(cls):
+        obj = cls.objects.first()
+        if obj is None:
+            obj = cls.objects.create()
+        return obj
+
+
+class ProcessedUpdate(models.Model):
+    update_id = models.BigIntegerField(unique=True)
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self) -> str:
+        return str(self.update_id)
+
+
+class AIDecisionLog(models.Model):
+    conversation = models.ForeignKey(
+        Conversation, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    input_text = models.TextField(blank=True)
+    kb_version = models.CharField(max_length=64, blank=True)
+    intent = models.CharField(max_length=64, blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    action = models.CharField(max_length=16, blank=True)  # answer|notify|escalate|skipped
+    output_text = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
